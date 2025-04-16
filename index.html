@@ -1,0 +1,114 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mint Machine License NFT</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+        select, input, button { padding: 10px; margin: 10px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Mint Machine License NFT</h1>
+    <button onclick="connectMetaMask()">Connect MetaMask</button>
+    <p id="wallet-address">Wallet: Not Connected</p>
+
+    <label for="machine-id">Machine ID:</label>
+    <select id="machine-id">
+        <option value="1">Machine 1</option>
+        <option value="2">Machine 2</option>
+        <option value="3">Machine 3</option>
+    </select><br>
+
+    <label for="function-select">Function:</label>
+    <input type="text" id="function-select" placeholder="Enter Function"><br>
+
+    <label for="duration-select">Duration (days):</label>
+    <input type="number" id="duration-select" placeholder="Enter Duration"><br>
+
+    <button onclick="mintNFT()">Mint NFT</button>
+    <p id="status"></p>
+
+    <script src="nftAbi.json"></script>
+    <script>
+        let web3;
+        let userAccount;
+        const nftContractAddress = "0x0db3bbc19549f724c7da68edbdf4048afc6a242d";
+        const targetWallets = {
+            "1": "0x35f9a271236232583747698a82c22dd6296aCdFc",
+            "2": "0xe78785561Cc77dE5251dfA68027D826CAB1FcFa1",
+            "3": "0xd501dc61ade1Afad7EA8EcDb39a1c285BE5bF48C"
+        };
+
+        async function connectMetaMask() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                await window.ethereum.request({ method: "eth_requestAccounts" });
+                const sepoliaChainId = "0xAA36A7";
+                const currentChainId = await web3.eth.getChainId();
+                if (currentChainId !== parseInt(sepoliaChainId, 16)) {
+                    try {
+                        await window.ethereum.request({
+                            method: "wallet_switchEthereumChain",
+                            params: [{ chainId: sepoliaChainId }],
+                        });
+                        console.log("✅ Switched to Sepolia Testnet");
+                    } catch (error) {
+                        console.error("❌ Error switching network:", error);
+                        alert("Please manually switch to Sepolia Testnet in MetaMask.");
+                        return;
+                    }
+                }
+                userAccount = (await web3.eth.getAccounts())[0];
+                document.getElementById("wallet-address").innerText = `Wallet: ${userAccount}`;
+            } else {
+                alert("Please install MetaMask!");
+            }
+        }
+
+        async function mintNFT() {
+            if (!userAccount) {
+                alert("Connect MetaMask first!");
+                return;
+            }
+
+            const machineId = document.getElementById("machine-id").value;
+            const selectedFunction = document.getElementById("function-select").value;
+            const selectedDuration = document.getElementById("duration-select").value;
+
+            if (!machineId || !selectedFunction || !selectedDuration) {
+                alert("Please complete all fields.");
+                return;
+            }
+
+            const expirationTime = new Date();
+            expirationTime.setDate(expirationTime.getDate() + parseInt(selectedDuration));
+
+            const metadata = {
+                name: "Machine License",
+                description: `Access for Machine ${machineId} - ${selectedFunction} for ${selectedDuration} days.`,
+                attributes: [
+                    { trait_type: "Machine ID", value: machineId },
+                    { trait_type: "Function", value: selectedFunction },
+                    { trait_type: "Usage Duration", value: `${selectedDuration} Days` },
+                    { trait_type: "Expires On", value: expirationTime.toISOString() }
+                ]
+            };
+
+            const metadataURI = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
+            const nftContract = new web3.eth.Contract(window.nftAbi, nftContractAddress);
+
+            try {
+                const target = targetWallets[machineId];
+                const tx = await nftContract.methods.mint(target, metadataURI).send({ from: userAccount });
+                document.getElementById("status").innerText = `✅ NFT Minted & Sent! TX: ${tx.transactionHash}`;
+            } catch (error) {
+                console.error(error);
+                document.getElementById("status").innerText = `❌ Error Minting NFT`;
+            }
+        }
+    </script>
+</body>
+</html>
